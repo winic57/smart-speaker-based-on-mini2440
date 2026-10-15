@@ -44,7 +44,7 @@ int InitDriver()
 	}
 
 	//打开mixer设备文件
-	g_mixerfd = open("/dev/mixer", O_WRONLY);
+	g_mixerfd = open("/dev/mixer", O_RDWR);
 	if (-1 == g_mixerfd)
 	{
 		printf("warning: open /dev/mixer failed, volume control disabled\n");

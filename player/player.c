@@ -377,11 +377,11 @@ static void apply_volume(void)
 	int iLevel;
 
 	iLeft = 80;
-	iLevel = (iRight << 8) + iLeft;
-	if (g_mixerfd != -1)
-	{
-		ioctl(g_mixerfd, MIXER_WRITE(SOUND_MIXER_VOLUME), &iLevel);
-	}
+	iRight = 80;
+	iLevel = (iRight << 8) | iLeft;
+	if (g_mixerfd != -1 && ioctl(g_mixerfd, MIXER_WRITE(SOUND_MIXER_VOLUME), &iLevel) < 0)
+		perror("设置音量");
+	fprintf(stderr, "音量 %d\n", iLeft);
 }
 
 static void begin_season(int season)
@@ -831,30 +831,32 @@ void voice_up()
 
 	if (iLeft < 100)
 	{
-		iLeft += 5;
+		iLeft += 10;
 	}
-
-	iLevel = (iRight << 8) + iLeft;
-	if (g_mixerfd != -1)
-	{
-		ioctl(g_mixerfd, MIXER_WRITE(SOUND_MIXER_VOLUME), &iLevel);
-	}
+	if (iLeft > 100)
+		iLeft = 100;
+	iRight = iLeft;
+	iLevel = (iRight << 8) | iLeft;
+	if (g_mixerfd != -1 && ioctl(g_mixerfd, MIXER_WRITE(SOUND_MIXER_VOLUME), &iLevel) < 0)
+		perror("设置音量");
+	fprintf(stderr, "音量 %d\n", iLeft);
 }
 
 void voice_down()
 {
 	int iLevel;
 
-	if (iLeft > 5)
+	if (iLeft > 0)
 	{
-		iLeft -= 5;
+		iLeft -= 10;
 	}
-
-	iLevel = (iRight << 8) + iLeft;
-	if (g_mixerfd != -1)
-	{
-		ioctl(g_mixerfd, MIXER_WRITE(SOUND_MIXER_VOLUME), &iLevel);
-	}
+	if (iLeft < 0)
+		iLeft = 0;
+	iRight = iLeft;
+	iLevel = (iRight << 8) | iLeft;
+	if (g_mixerfd != -1 && ioctl(g_mixerfd, MIXER_WRITE(SOUND_MIXER_VOLUME), &iLevel) < 0)
+		perror("设置音量");
+	fprintf(stderr, "音量 %d\n", iLeft);
 }
 
 void set_mode(int mode)
