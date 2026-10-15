@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "mini2440 智能音箱",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/architecture-smart-speaker-20261015-182521/smart-speaker.html",
+    "repository": {
+      "url": "https://github.com/winic57/smart-speaker-based-on-mini2440",
+      "provider": "github",
+      "revision": "c6d5a1acc0c56275bc6003d3190ca89d2e075d61"
+    }
+  },
+  "components": [
+    {
+      "id": "person",
+      "type": "external",
+      "label": "使用的人",
+      "sublabel": "说出命令",
+      "pos": [36, 214],
+      "size": [120, 64],
+      "sources": [{ "path": "player/select.c", "line": 220, "label": "语音命令入口" }]
+    },
+    {
+      "id": "asr",
+      "type": "external",
+      "label": "语音板",
+      "sublabel": "ASRPRO 串口2",
+      "pos": [230, 206],
+      "size": [168, 76],
+      "tag": "115200",
+      "sources": [{ "path": "player/device.c", "line": 59, "label": "接到 ttySAC1" }]
+    },
+    {
+      "id": "player",
+      "type": "backend",
+      "label": "asr-player",
+      "sublabel": "季内循环，30 分钟停",
+      "pos": [490, 198],
+      "size": [188, 92],
+      "sources": [
+        { "path": "player/select.c", "line": 211, "label": "按字节分派" },
+        { "path": "player/player.c", "line": 387, "label": "按季开播" }
+      ]
+    },
+    {
+      "id": "madplay",
+      "type": "backend",
+      "label": "madplay",
+      "sublabel": "解码 mp3",
+      "pos": [770, 210],
+      "size": [140, 68],
+      "sources": [{ "path": "player/player.c", "line": 530, "label": "可从秒数续播" }]
+    },
+    {
+      "id": "speaker",
+      "type": "external",
+      "label": "喇叭",
+      "sublabel": "/dev/dsp",
+      "pos": [990, 214],
+      "size": [120, 64]
+    },
+    {
+      "id": "app",
+      "type": "frontend",
+      "label": "手机 APP",
+      "sublabel": "Qt 遥控",
+      "pos": [36, 36],
+      "size": [140, 64],
+      "sources": [{ "path": "app/player.cpp", "line": 13, "label": "接收服务器回复" }]
+    },
+    {
+      "id": "server",
+      "type": "backend",
+      "label": "speaker-server",
+      "sublabel": "192.168.50.129:8000",
+      "pos": [250, 40],
+      "size": [210, 76],
+      "tag": "Docker",
+      "sources": [
+        { "path": "docker-server/server.cpp", "line": 20, "label": "监听 8000" },
+        { "path": "player/speaker.conf", "line": 5, "label": "板子上的服务器地址" }
+      ]
+    },
+    {
+      "id": "sd",
+      "type": "database",
+      "label": "SD 卡曲库",
+      "sublabel": "第1季到第12季",
+      "pos": [490, 390],
+      "size": [188, 72],
+      "sources": [{ "path": "player/speaker.conf", "line": 12, "label": "music_path" }]
+    },
+    {
+      "id": "bookmark",
+      "type": "database",
+      "label": "断点文件",
+      "sublabel": "peppa.pos",
+      "pos": [760, 394],
+      "size": [160, 64],
+      "sources": [{ "path": "player/player.c", "line": 158, "label": "记下季、曲、秒数" }]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "mini2440 开发板",
+      "wraps": ["player", "madplay", "sd", "bookmark"]
+    },
+    {
+      "kind": "region",
+      "label": "LPA3399Pro",
+      "wraps": ["server"]
+    }
+  ],
+  "connections": [
+    { "id": "speak", "from": "person", "to": "asr", "label": "唤醒和命令", "variant": "emphasis" },
+    { "id": "uart", "from": "asr", "to": "player", "label": "串口字节", "variant": "emphasis" },
+    { "id": "fork-play", "from": "player", "to": "madplay", "label": "启动播放" },
+    { "id": "pcm", "from": "madplay", "to": "speaker", "label": "PCM" },
+    { "id": "read-music", "from": "player", "to": "sd", "label": "只读当前季" },
+    { "id": "save-pos", "from": "player", "to": "bookmark", "label": "读写断点" },
+    { "id": "app-cmd", "from": "app", "to": "server", "label": "JSON 控制" },
+    { "id": "srv-cmd", "from": "server", "to": "player", "label": "TCP 8000", "variant": "dashed" },
+    { "id": "alive", "from": "player", "to": "server", "label": "保活", "variant": "dashed" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "语音怎么播",
+      "items": [
+        "语音板只发一字节：播放、停止、上下一首、音量，或第几季",
+        "没在播时说继续播放，也会从断点重新开始"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "离线也能放",
+      "items": [
+        "歌在 SD 卡，不从服务器下载",
+        "服务器连不上时，串口和按键仍然可以播放"
+      ]
+    }
+  ]
+}
