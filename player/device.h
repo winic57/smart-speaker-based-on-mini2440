@@ -1,8 +1,12 @@
 #ifndef DEVICE_H
 #define DEVICE_H
 
+#include <termios.h>
+
 int InitDriver();
-int led_on(int which);
-int led_off(int which);
+void led_on(int which);
+void led_off(int which);
+int InitSerial(const char *dev);
+int get_key_id();
 
 #endif

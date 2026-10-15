@@ -2,9 +2,8 @@
 #define PLAYER_H
 
 #include <unistd.h>
+#include "config.h"
 
-//#define MUSICPATH   "/root/music_list/"
-#define MUSICPATH   "/mount/usb/"
 #define SHMKEY     1234
 #define SHMSIZE    4096
 
@@ -16,7 +15,7 @@
 struct shm
 {
 	int play_mode;
-	char cur_name[64];
+	char cur_name[128];
 	pid_t ppid;
 	pid_t child_pid;
 	pid_t grand_pid;
@@ -24,7 +23,9 @@ struct shm
 typedef struct shm shm;
 
 int InitShm();
-void GetMusic();
+void init_library();
+void player_tick();
+void play_season(int season);
 void start_play();
 void stop_play();
 void suspend_play();
@@ -34,6 +35,7 @@ void next_play();
 void voice_up();
 void voice_down();
 void set_mode(int mode);
+void single_play(const char *singer);
 
 
 #endif

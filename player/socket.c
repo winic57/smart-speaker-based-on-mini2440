@@ -13,8 +13,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <signal.h>
-//#include <json-c/json.h>
-#include <json/json.h>
+#include "config.h"
 #include "player.h"
 #include <sys/select.h>
 #include "link.h"
@@ -28,60 +27,81 @@ extern fd_set readfd;
 extern int g_maxfd;
 extern void *g_addr;
 
-//5秒执行一次，向服务器发送 alive 字符串
+volatile int g_link_down = 1;
+
+static int reopen_socket(void)
+{
+	if (g_sockfd >= 0)
+		close(g_sockfd);
+	g_sockfd = socket(PF_INET, SOCK_STREAM, 0);
+	return g_sockfd;
+}
+
+//每 keepalive 秒执行一次，向服务器发送 alive 字符串
 void send_server(int sig)
 {
 	struct json_object *json = json_object_new_object();
 	json_object_object_add(json, "cmd", json_object_new_string("info"));
 	json_object_object_add(json, "status", json_object_new_string("alive"));
-	json_object_object_add(json, "deviceid", json_object_new_string("001"));
+	json_object_object_add(json, "deviceid", json_object_new_string(g_conf.device_id));
 
 	const char *buf = json_object_to_json_string(json);
 	int ret = send(g_sockfd, buf, strlen(buf), 0);
 	if (-1 == ret)
 	{
 		perror("send");
+		g_link_down = 1;
+		return;
 	}
 
-	alarm(TIMEOUT);
+	alarm(g_conf.keepalive);
 }
 
 void *connect_cb(void *arg)
 {
-	int count = 5, ret;
+	int ret;
 	struct sockaddr_in server_addr;
 
 	memset(&server_addr, 0, sizeof(server_addr));
 	server_addr.sin_family = PF_INET;
-	server_addr.sin_port = htons(SERVER_PORT);
-	server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
+	server_addr.sin_port = htons(g_conf.server_port);
+	server_addr.sin_addr.s_addr = inet_addr(g_conf.server_ip);
 
-	while (count--)
+	while (1)
 	{
 		ret = connect(g_sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr));
 		if (ret == -1)
 		{
+			perror("connect");
 			sleep(5);
+			if (reopen_socket() < 0)
+				return NULL;
 			continue;
 		}
-		
-		//连接成功，点亮 4 个LED灯
+
+		printf("已连接服务器 %s:%d\n", g_conf.server_ip, g_conf.server_port);
 		led_on(0);
 		led_on(1);
 		led_on(2);
 		led_on(3);
 
-		alarm(TIMEOUT);
+		alarm(g_conf.keepalive);
 		signal(SIGALRM, send_server);
 
-		//连接服务器成功，fd添加到集合
 		FD_SET(g_sockfd, &readfd);
 		if (g_maxfd < g_sockfd)
-		{
 			g_maxfd = g_sockfd;
-		}
+		g_link_down = 0;
 
-		break;
+		while (!g_link_down)
+			sleep(1);
+
+		printf("与服务器断开，5 秒后重连\n");
+		alarm(0);
+		FD_CLR(g_sockfd, &readfd);
+		if (reopen_socket() < 0)
+			return NULL;
+		sleep(5);
 	}
 
 	return NULL;

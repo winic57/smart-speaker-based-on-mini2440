@@ -8,7 +8,6 @@
 
 extern struct Node *head;
 
-//初始化双向循环链表
 int InitLink()
 {
 	head = (Node *)malloc(sizeof(Node) * 1);
@@ -23,6 +22,24 @@ int InitLink()
 	return SUCCESS;
 }
 
+void ClearLink()
+{
+	if (NULL == head)
+	{
+		return;
+	}
+
+	Node *p = head->next;
+	while (p != head)
+	{
+		Node *n = p->next;
+		free(p);
+		p = n;
+	}
+	head->next = head;
+	head->prior = head;
+}
+
 int InsertLink(Node *h, const char *name)
 {
 	if (NULL == h || NULL == name)
@@ -32,7 +49,6 @@ int InsertLink(Node *h, const char *name)
 
 	Node *end = h->prior;
 
-
 	Node *n = (Node *)malloc(sizeof(Node) * 1);
 	if (NULL == n)
 	{
@@ -40,7 +56,8 @@ int InsertLink(Node *h, const char *name)
 	}
 
 	n->next = h;
-	strcpy(n->music_name, name);
+	strncpy(n->music_name, name, sizeof(n->music_name) - 1);
+	n->music_name[sizeof(n->music_name) - 1] = '\0';
 	end->next = n;
 	n->prior = end;
 	h->prior = n;
@@ -48,29 +65,55 @@ int InsertLink(Node *h, const char *name)
 	return SUCCESS;
 }
 
-/*
-函数描述：根据当前歌曲和播放模式，找到下一首歌
-函数参数：cur：当前歌曲
-          mode:播放模式
-          next：存放下一首歌名
-返回值：无
-*/
+//找不到当前曲名时不要在循环链表里空转
+static Node *find_named(const char *cur)
+{
+	if (NULL == head || head->next == head || NULL == cur)
+	{
+		return NULL;
+	}
+
+	Node *p = head->next;
+	Node *start = p;
+	do
+	{
+		if (strcmp(p->music_name, cur) == 0)
+		{
+			return p;
+		}
+		p = p->next;
+		if (p == head)
+		{
+			p = p->next;
+		}
+	} while (p != start);
+
+	return NULL;
+}
+
 void FindNextMusic(const char *cur, int mode, char *next)
 {
-	if (mode == CIRCLE)     //单曲循环
+	if (head->next == head)
+	{
+		next[0] = '\0';
+		return;
+	}
+
+	if (mode == CIRCLE)
 	{
 		strcpy(next, cur);
 		return;
 	}
 	else if (mode == SEQUENCEMODE)
 	{
-		Node *p = head->next;
-		while (strcmp(p->music_name, cur) != 0)
+		Node *p = find_named(cur);
+		if (NULL == p)
 		{
-			p = p->next;
+			strcpy(next, head->next->music_name);
+			return;
 		}
-			
-		if (p->next == head)          //忽略头结点
+
+		if (p->next == head)
 		{
 			strcpy(next, head->next->music_name);
 		}
@@ -80,7 +123,7 @@ void FindNextMusic(const char *cur, int mode, char *next)
 		}
 		return;
 	}
-	else 
+	else
 	{
 		Node *p = head->next;
 		srand(time(NULL));
@@ -107,17 +150,23 @@ void FindNextMusic(const char *cur, int mode, char *next)
 
 void PriorMusic(const char *cur, int mode, char *prior)
 {
+	if (head->next == head)
+	{
+		prior[0] = '\0';
+		return;
+	}
+
 	if (mode == SEQUENCEMODE || mode == CIRCLE)
 	{
-		Node *p = head->next;
-		while (strcmp(p->music_name, cur) != 0)
+		Node *p = find_named(cur);
+		if (NULL == p)
 		{
-			p = p->next;
+			strcpy(prior, head->prior->music_name);
+			return;
 		}
 
 		if (p == head->next)
 		{
-			printf("%s\n", head->prior->music_name);
 			strcpy(prior, head->prior->music_name);
 		}
 		else
@@ -126,7 +175,7 @@ void PriorMusic(const char *cur, int mode, char *prior)
 		}
 		return;
 	}
-	else 
+	else
 	{
 		Node *p = head->next;
 		srand(time(NULL));
@@ -153,12 +202,19 @@ void PriorMusic(const char *cur, int mode, char *prior)
 
 void NextMusic(const char *cur, int mode, char *next)
 {
+	if (head->next == head)
+	{
+		next[0] = '\0';
+		return;
+	}
+
 	if (mode == SEQUENCEMODE || mode == CIRCLE)
 	{
-		Node *p = head->next;
-		while (strcmp(p->music_name, cur) != 0)
+		Node *p = find_named(cur);
+		if (NULL == p)
 		{
-			p = p->next;
+			strcpy(next, head->next->music_name);
+			return;
 		}
 
 		if (p->next == head)
@@ -171,7 +227,7 @@ void NextMusic(const char *cur, int mode, char *next)
 		}
 		return;
 	}
-	else 
+	else
 	{
 		Node *p = head->next;
 		srand(time(NULL));

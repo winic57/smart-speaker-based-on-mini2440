@@ -31,7 +31,26 @@ void Player::player_alive_info(std::list<Node> *l, struct bufferevent *bev, Json
 		}
 	}
 
-	std::cout << "收到保活消息 但是设备未绑定" << std::endl;
+	std::cout << "收到保活消息 但是设备未绑定，先记下连接" << std::endl;
+
+	Node n;
+	memset(&n, 0, sizeof(n));
+	strcpy(n.device_id, deviceid);
+	l->push_back(n);
+	std::list<Node>::iterator it = l->end();
+	--it;
+	it->device_bev = bev;
+	it->online_flag = 1;
+	it->time = time(NULL);
+
+	tNode *tn = new tNode;
+	tn->l = l;
+	strcpy(tn->id, deviceid);
+	event_assign(&(it->timeout), base, -1, EV_PERSIST, timeout_cb, tn);
+	struct timeval tv;
+	evutil_timerclear(&tv);
+	tv.tv_sec = 1;
+	event_add(&(it->timeout), &tv);
 }
 
 /*
@@ -93,15 +112,15 @@ void Player::player_operation(std::list<Node> *l, struct bufferevent *app_bev, c
 
 	std::string str = Json::FastWriter().write(val);
 	size_t ret;
-	
+
 	//遍历链表判断是否在线
 	for (std::list<Node>::iterator it = l->begin(); it != l->end(); it++)
 	{
-		if (it->app_bev == app_bev)	
+		if (it->app_bev == app_bev)
 		{
-			if (it->online_flag == 1)      //在线
+			if (it->online_flag == 1 && it->device_bev != NULL)      //在线
 			{
-				ret = bufferevent_write(it->device_bev, str.c_str(), strlen(str.c_str()));	
+				ret = bufferevent_write(it->device_bev, str.c_str(), strlen(str.c_str()));
 				if (ret < 0)
 				{
 					std::cout << "bufferevent_write error" << std::endl;
@@ -113,15 +132,15 @@ void Player::player_operation(std::list<Node> *l, struct bufferevent *app_bev, c
 				v["cmd"] = "app_reply";
 				v["result"] = "off_line";
 				std::string s = Json::FastWriter().write(v);
-				ret = bufferevent_write(app_bev, s.c_str(), strlen(s.c_str()));	
+				ret = bufferevent_write(app_bev, s.c_str(), strlen(s.c_str()));
 				if (ret < 0)
 				{
 					std::cout << "bufferevent_write error" << std::endl;
 				}
 
 			}
+			break;      //找到就停，原来 break 放在 if 外导致只查第一个节点
 		}
-		break;
 	}
 }
 
@@ -154,7 +173,7 @@ void Player::player_reply_result(std::list<Node> *l, struct bufferevent *bev, Js
 	{
 		if (it->device_bev == bev)
 		{
-			if (it->app_online_flag == 1)
+			if (it->app_online_flag == 1 && it->app_bev != NULL)
 			{
 				ret = bufferevent_write(it->app_bev, str.c_str(), strlen(str.c_str()));
 				if (ret < 0)
@@ -175,7 +194,7 @@ void Player::timeout_cb(evutil_socket_t fd, short event, void *arg)
 	std::cout << "定时器事件" << std::endl;
 	tNode t;
 	memcpy(&t, arg, sizeof(tNode));
-	
+
 	//1、根据 time 判断音箱是否在线
 	std::list<Node>::iterator it;
 	for (it = (t.l)->begin(); it != (t.l)->end(); it++)
@@ -186,7 +205,7 @@ void Player::timeout_cb(evutil_socket_t fd, short event, void *arg)
 			{
 				it->online_flag = 0;     //表示不在线
 			}
-			else 
+			else
 			{
 				it->online_flag = 1;
 			}
@@ -194,8 +213,14 @@ void Player::timeout_cb(evutil_socket_t fd, short event, void *arg)
 		}
 	}
 
+	//遍历完没找到，别再解引用 it（原代码此处必崩）
+	if (it == (t.l)->end())
+	{
+		return;
+	}
+
 	//2、如果音箱和 APP 同时在线，则发起状态请求
-	if (it->app_online_flag == 1 && it->online_flag == 1)
+	if (it->app_online_flag == 1 && it->online_flag == 1 && it->device_bev != NULL)
 	{
 		Json::Value val;
 		val["cmd"] = "get";

@@ -12,6 +12,10 @@ PlayerServer::PlayerServer(const char *ip, int port)
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(port);
 	server_addr.sin_addr.s_addr = inet_addr(ip);
+	if (strcmp(ip, "0.0.0.0") == 0)
+	{
+		server_addr.sin_addr.s_addr = INADDR_ANY;
+	}
 
 	listener = evconnlistener_new_bind(base, listener_cb, base, 
 		LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE, 10, (struct sockaddr *)&server_addr, sizeof(server_addr));
@@ -74,15 +78,58 @@ void PlayerServer::read_cb(struct bufferevent *bev, void *ctx)
 	//app发送的消息
 	if (!strcmp(cmd, "bind"))                //绑定功能
 	{
-		Node n;
+		//同一 appid 重复 bind 时更新原节点，不新增（每次 push_back 会让 app/device 配对错乱）
+		std::string appid = val["appid"].asString();
+		std::list<Node>::iterator found;
+		for (found = l->begin(); found != l->end(); found++)
+		{
+			if (appid == found->app_id)
+			{
+				break;
+			}
+		}
 
-		n.app_bev = bev;
-		strcpy(n.app_id, val["appid"].asString().c_str());
-		strcpy(n.device_id, val["deviceid"].asString().c_str());
-		n.online_flag = 0;
-		n.app_online_flag = 1;
+		if (found != l->end())
+		{
+			found->app_bev = bev;
+			strcpy(found->app_id, val["appid"].asString().c_str());
+			if (strcmp(found->device_id, val["deviceid"].asString().c_str()) != 0)
+			{
+				strcpy(found->device_id, val["deviceid"].asString().c_str());
+				found->device_bev = NULL;
+				found->online_flag = 0;
+			}
+			found->app_online_flag = 1;
+		}
+		else
+		{
+			std::list<Node>::iterator dev;
+			for (dev = l->begin(); dev != l->end(); dev++)
+			{
+				if (dev->app_id[0] == 0 &&
+					!strcmp(dev->device_id, val["deviceid"].asString().c_str()))
+				{
+					break;
+				}
+			}
 
-		l->push_back(n);
+			if (dev != l->end())
+			{
+				dev->app_bev = bev;
+				strcpy(dev->app_id, val["appid"].asString().c_str());
+				dev->app_online_flag = 1;
+			}
+			else
+			{
+				Node n;
+				memset(&n, 0, sizeof(n));
+				n.app_bev = bev;
+				strcpy(n.app_id, val["appid"].asString().c_str());
+				strcpy(n.device_id, val["deviceid"].asString().c_str());
+				n.app_online_flag = 1;
+				l->push_back(n);
+			}
+		}
 
 		//回复APP
 		val["cmd"] = "bind_success";

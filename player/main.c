@@ -5,8 +5,9 @@
 #include "socket.h"
 #include "link.h"
 #include "player.h"
+#include "config.h"
 #include <signal.h>
-#include <sys/ipc.h> 
+#include <sys/ipc.h>
 #include <sys/shm.h>
 #include <string.h>
 #include <sys/select.h>
@@ -14,6 +15,7 @@
 int g_buttonfd = 3;
 int g_ledfd;
 int g_mixerfd;
+int g_serialfd = -1;
 int g_sockfd = 3;
 struct Node *head;
 extern int shmid;
@@ -40,15 +42,25 @@ void handler(int sig)
 	exit(0);
 }
 
-int main()
+int main(int argc, char *argv[])
 {
 	int ret;
-	ret = InitDriver();     //打开设备文件
+	ret = InitDriver();     //打开设备文件（失败只警告，不退出）
 	if (FAILURE == ret)
 	{
 		printf("初始化设备文件失败\n");
 		exit(1);
 	}
+
+	//加载配置文件：默认 /etc/speaker.conf，可用第一个参数指定
+	const char *conf_path = (argc > 1) ? argv[1] : "/etc/speaker.conf";
+	if (FAILURE == load_config(conf_path))
+	{
+		printf("warning: %s 不存在，使用默认配置\n", conf_path);
+	}
+	printf("配置: server=%s:%d deviceid=%s music=%s madplay=%s keepalive=%d play_minutes=%d\n",
+		g_conf.server_ip, g_conf.server_port, g_conf.device_id,
+		g_conf.music_path, g_conf.madplay_path, g_conf.keepalive, g_conf.play_minutes);
 	
 	InitSelect();
 
@@ -78,7 +90,7 @@ int main()
 	}
 
 	//读取音乐
-	GetMusic();
+	init_library();
 
 	//捕获ctrl c信号
 	signal(SIGINT, handler);

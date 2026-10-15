@@ -4,7 +4,7 @@
 #include <list>
 #include "node.h"
 #include <event.h>
-#include <jsoncpp/json/json.h>
+#include <json/json.h>
 #include <string.h>
 #include <time.h>
 #include <iostream>

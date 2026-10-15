@@ -1,10 +1,7 @@
 #ifndef SOCKET_H
 #define SOCKET_H
 
-#define SERVER_PORT   8000
-#define SERVER_IP     "47.101.128.140"
-//#define SERVER_IP    "127.0.0.1"
-#define TIMEOUT       1
+extern volatile int g_link_down;
 
 int InitSocket();
 void socket_start_play();

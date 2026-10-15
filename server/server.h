@@ -8,13 +8,13 @@
 #include <iostream>
 #include <string.h>
 #include <event2/listener.h>
-#include <jsoncpp/json/json.h>
+#include <json/json.h>
 #include <list>
 #include <time.h>
 #include "player.h"
 #include "node.h"
+#include "conf.h"
 
-#define IP    "172.17.7.99"
 #define PORT  8000
 
 
@@ -28,7 +28,7 @@ private:
 	static std::list<Node> *l;
 
 public:
-	PlayerServer(const char *ip = IP, int port = PORT);
+	PlayerServer(const char *ip = "0.0.0.0", int port = PORT);
 	~PlayerServer();
 
 private:     //作为回调函数使用

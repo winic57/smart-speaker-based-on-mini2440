@@ -1,0 +1,6 @@
+app/build/
+*.o
+*.obj
+asr-player
+docker-server/player-server
+server/player-server
